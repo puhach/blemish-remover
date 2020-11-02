@@ -13,27 +13,59 @@ class BlemishRemover
 {
 public:
 	BlemishRemover();
+	// TODO: define copy and move constructors along with assignment and move-assignment operators
+
 
 	void process(const char* inputFile);
 
+	
 private:
+
+	static constexpr const char windowName[] = "Blemish Removal";
+
+	static void onMouse(int event, int x, int y, int flags, void *data);
+
 	//string inputFile;
+	Mat imSrc, imPrev, imCur;
 };	// BlemishRemover
 
 
 BlemishRemover::BlemishRemover()
 {
+	namedWindow(BlemishRemover::windowName);
 
+	setMouseCallback(BlemishRemover::windowName, onMouse, this);
 }	// ctor
 
 void BlemishRemover::process(const char *inputFilePath)
 {
-	Mat imSrc = imread(inputFilePath, IMREAD_COLOR);
-	CV_Assert(!imSrc.empty());
-
-	imshow("Blemish Removal", imSrc);
-	waitKey();
+	this->imSrc = imread(inputFilePath, IMREAD_COLOR);
+	CV_Assert(!this->imSrc.empty());
+	
+	//this->imPrev = this->imSrc.clone();
+	this->imSrc.copyTo(this->imPrev);
+	this->imSrc.copyTo(this->imCur);
+		
+	int key;
+	do
+	{
+		imshow(BlemishRemover::windowName, imCur);
+		key = waitKey(10);		
+	} while (true);
 }	// process
+
+
+void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
+{
+	BlemishRemover* br = static_cast<BlemishRemover*>(data);
+
+	switch (event)
+	{
+	case EVENT_LBUTTONUP:
+		circle(br->imCur, Point(x, y), 5, Scalar(0,255,0), -1);
+		break;
+	}
+}	// onMouse
 
 int main(int argc, char* argv[])
 {
