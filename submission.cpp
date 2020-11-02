@@ -8,13 +8,52 @@
 using namespace std;
 using namespace cv;
 
-int main(int argc, char* argv[])
+
+class BlemishRemover
 {
-	Mat imSrc = imread("blemish.png", IMREAD_COLOR);
+public:
+	BlemishRemover();
+
+	void process(const char* inputFile);
+
+private:
+	//string inputFile;
+};	// BlemishRemover
+
+
+BlemishRemover::BlemishRemover()
+{
+
+}	// ctor
+
+void BlemishRemover::process(const char *inputFilePath)
+{
+	Mat imSrc = imread(inputFilePath, IMREAD_COLOR);
 	CV_Assert(!imSrc.empty());
 
 	imshow("Blemish Removal", imSrc);
 	waitKey();
+}	// process
+
+int main(int argc, char* argv[])
+{
+	if (argc != 2)
+	{
+		cout << "Usage: reblemish <input image>" << endl;
+		return -1;
+	}
+
+	try
+	{
+		BlemishRemover blemishRemover;
+		blemishRemover.process(argv[1]);
+	}
+	catch (const std::exception& e)		// cv::Exception inherits std::exception
+	{
+		cerr << e.what() << endl;
+		return -2;
+	}
+		
 
 	return 0;
 }
