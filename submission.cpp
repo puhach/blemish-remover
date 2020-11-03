@@ -27,7 +27,9 @@ private:
 
 	static constexpr const char windowName[] = "Blemish Removal";
 	static constexpr int maxUndoQueueLength = 10;
-	static constexpr int blemishSize = 25;	
+	// Blemish size must be odd
+	//static constexpr int blemishSize = 25;	
+	static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
 
 	static void onMouse(int event, int x, int y, int flags, void *data);
 
@@ -39,17 +41,20 @@ private:
 
 	bool undo();
 
+	void reset();
+
 	void decorate(int x, int y);
 
 	Mat imSrc, imCur, imDecorated;
 	deque<Mat> undoQueue;
+	int blemishSize = defaultBlemishSize;
 	int lastMouseX = 0, lastMouseY = 0;
 };	// BlemishRemover
 
 
 BlemishRemover::BlemishRemover()
 {
-	static_assert(BlemishRemover::blemishSize > 0 && BlemishRemover::blemishSize % 2 == 1, "Blemish size must be a positive odd integer.");
+	//static_assert(BlemishRemover::blemishSize > 0 && BlemishRemover::blemishSize % 2 == 1, "Blemish size must be a positive odd integer.");
 
 	namedWindow(BlemishRemover::windowName);
 
@@ -66,8 +71,7 @@ void BlemishRemover::process(const char *inputFilePath)
 	this->imSrc = imread(inputFilePath, IMREAD_COLOR);
 	CV_Assert(!this->imSrc.empty());
 	
-	this->imSrc.copyTo(this->imCur);
-	this->imCur.copyTo(this->imDecorated);
+	reset();
 	
 	for (int key = 0; (key & 0xFF) != 27; )		// exit on Escape
 	{
@@ -79,13 +83,13 @@ void BlemishRemover::process(const char *inputFilePath)
 		if (key == 26)		// Ctrl+Z
 		{
 			if (undo())	// undo
-				decorate(this->lastMouseX, this->lastMouseY);
+				decorate(this->lastMouseX, this->lastMouseY);	// draw a healing brush circle
+			else
+				cout << '\a';	// beep
 		}	// undo
 		else if ((key & 0xFF) == 'r' || (key & 0xFF) == 'R')
 		{
-			// Reset
-			this->imSrc.copyTo(this->imCur);
-			this->imSrc.copyTo(this->imDecorated);
+			reset();	// reset images and the undo queue
 		}	// reset
 	}	// for
 }	// process
@@ -98,29 +102,33 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 	switch (event)
 	{
 	case EVENT_LBUTTONUP:
-
-		// Save current state to the undo queue
-		br->saveState();
-		//circle(br->imCur, Point(x,y), BlemishRemover::blemishSize, Scalar(0,255,0), -1);
+		br->saveState();	// save current state to the undo queue
 		br->removeBlemish(x, y);
 		br->imCur.copyTo(br->imDecorated);
 		break;
 
 	case EVENT_MOUSEMOVE:
-		//br->imCur.copyTo(br->imDecorated);
 		br->decorate(x, y);
 		br->lastMouseX = x;
 		br->lastMouseY = y;
+		break;
+
+	case EVENT_MOUSEWHEEL:
+		if (getMouseWheelDelta(flags) > 0)
+			br->blemishSize = min(br->blemishSize + blemishSizeStep, br->maxBlemishSize);
+		else
+			br->blemishSize = max(br->blemishSize - blemishSizeStep, br->minBlemishSize);
+
+		br->decorate(x, y);		
 		break;
 	}	// switch
 }	// onMouse
 
 void BlemishRemover::removeBlemish(int x, int y)
 {
-	// TODO: if we allow a variable blemish size, static must be removed!
-
 	// In order to be able to remove blemishes from image corners, we need to pad the image
-	static constexpr int padding = BlemishRemover::blemishSize / 2;
+	int padding = this->blemishSize / 2;
+	//static constexpr int padding = BlemishRemover::blemishSize / 2;
 	Mat imPadded;
 	copyMakeBorder(this->imCur, imPadded, padding, padding, padding, padding, BORDER_REFLECT | BORDER_ISOLATED);
 
@@ -137,7 +145,7 @@ void BlemishRemover::removeBlemish(int x, int y)
 	////cout << absGrad << endl;
 
 	// The direction arrays aid in calculating the centers of the neighboring regions
-	static constexpr int ndirs = 4;
+	static constexpr int ndirs = 4;		// TODO: perhaps, use 8 directions?
 	static constexpr int xdir[ndirs] = { -1, 0, +1, 0 }, ydir[ndirs] = { 0, -1, 0, +1 };
 
 	// Select the smoothest neighboring region
@@ -170,7 +178,7 @@ void BlemishRemover::removeBlemish(int x, int y)
 
 	if (bestPatch.empty())
 	{
-		cout << "Unable to fix this blemish due to the lack of surrounding pixels." << endl;
+		cout << "Unable to fix this blemish due to the lack of surrounding pixels." << '\a' << endl;
 		return;
 	}
 
@@ -182,8 +190,10 @@ void BlemishRemover::removeBlemish(int x, int y)
 	// Replace the blemish region with the smoothest neighboring region
 	Mat blend;
 	seamlessClone(bestPatch, imPadded, mask, Point(padding + x, padding + y), blend, NORMAL_CLONE);
-	//seamlessClone(bestPatch, imPadded, Mat(bestPatch.size(), CV_8UC1, Scalar(255)), Point(padding+x,padding+y), blend, NORMAL_CLONE);	
-	//seamlessClone(bestPatch, this->imCur, Mat(bestPatch.size(), CV_8UC1, Scalar(255)), Point(x, y), blend, NORMAL_CLONE);
+	//cout << blend.type() << endl;
+	/*Mat tmp = bestPatch.clone();
+	cout << tmp.size() << endl;
+	seamlessClone(tmp, imPadded, mask, Point(padding + x, padding + y), blend, NORMAL_CLONE);*/
 	this->imCur = blend(Rect(padding, padding, this->imCur.cols, this->imCur.rows));
 }	// removeBlemish
 
@@ -210,8 +220,7 @@ void BlemishRemover::saveState()
 bool BlemishRemover::undo()
 {
 	if (this->undoQueue.empty())
-	{
-		cout << '\a';	// beep
+	{		
 		return false;
 	}
 	else
@@ -222,15 +231,27 @@ bool BlemishRemover::undo()
 	}
 }	// undo
 
+void BlemishRemover::reset()
+{
+	this->imSrc.copyTo(this->imCur);
+	this->imCur.copyTo(this->imDecorated);
+	this->undoQueue.clear();
+	this->blemishSize = BlemishRemover::defaultBlemishSize;
+}	// reset
+
 void BlemishRemover::decorate(int x, int y)
 {
 	this->imCur.copyTo(this->imDecorated);
 
+	// TODO: try checking just one border pixel
 	// Don't draw the circle if it exceeds image boundaries
 	int r = BlemishRemover::blemishSize / 2;
+	//int r = BlemishRemover::blemishSize / 2;
 	if (x-r >= 0 && x+r < this->imDecorated.cols && y-r >= 0 && y+r < this->imDecorated.rows)
 		circle(this->imDecorated, Point(x, y), r, Scalar(233, 233, 233), 1);
 }	// decorate
+
+
 
 int main(int argc, char* argv[])
 {
