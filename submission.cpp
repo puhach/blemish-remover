@@ -4,6 +4,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/photo.hpp>
+#include <opencv2/imgproc/types_c.h>
 #include <iostream>
 #include <deque>
 
@@ -101,24 +102,25 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 
 void BlemishRemover::removeBlemish(int x, int y)
 {
-	// In order to be able to remove blemishes from image corners, we need to pad the image
+	// TODO: if we allow a variable blemish size, static must be removed!
 
+	// In order to be able to remove blemishes from image corners, we need to pad the image
 	static constexpr int padding = BlemishRemover::blemishSize / 2;
 	Mat imPadded;
 	copyMakeBorder(this->imCur, imPadded, padding, padding, padding, padding, BORDER_REFLECT | BORDER_ISOLATED);
 
 	// Compute gradients to measure smoothness (since the input image is 8-bit, the derivatives will be truncated)
 	Mat gradX, gradY;
-	Sobel(imPadded, gradX, CV_16S, 1, 0, 3);	// TODO: try using Scharr
-	Sobel(imPadded, gradY, CV_16S, 0, 1, 3);
+	Sobel(imPadded, gradX, CV_16S, 1, 0, CV_SCHARR);	// Scharr filter that may give more accurate results than 3x3 Sobel
+	Sobel(imPadded, gradY, CV_16S, 0, 1, CV_SCHARR);
 	Mat absGrad = abs(gradX) + abs(gradY);
 	//cout << absGrad << endl;
 
-	// The direction arrays aid in calculating the starting row/column of the neighbor regions
+	// The direction arrays aid in calculating the centers of the neighboring regions
 	static constexpr int ndirs = 4;
-	//static constexpr int xdir[ndirs] = { -3, -1, +1, -1 }, ydir[ndirs] = { -1, -3, -1, +1 };
 	static constexpr int xdir[ndirs] = { -1, 0, +1, 0 }, ydir[ndirs] = { 0, -1, 0, +1 };
 
+	// Select the smoothest neighboring region
 	Mat bestPatch;
 	double minSharpness = numeric_limits<double>::max();
 
@@ -146,8 +148,15 @@ void BlemishRemover::removeBlemish(int x, int y)
 		return;
 	}
 
+	// Create a round mask for the selected rectangular patch
+	Mat mask(bestPatch.size(), CV_8UC1, Scalar(0));
+	CV_Assert(mask.rows == blemishSize && mask.cols == blemishSize);
+	circle(mask, Point(bestPatch.cols / 2, bestPatch.rows / 2), blemishSize, Scalar(255), -1);
+
+	// Replace the blemish region with the smoothest neighboring region
 	Mat blend;
-	seamlessClone(bestPatch, imPadded, Mat(bestPatch.size(), CV_8UC1, Scalar(255)), Point(padding+x,padding+y), blend, NORMAL_CLONE);	
+	seamlessClone(bestPatch, imPadded, mask, Point(padding + x, padding + y), blend, NORMAL_CLONE);
+	//seamlessClone(bestPatch, imPadded, Mat(bestPatch.size(), CV_8UC1, Scalar(255)), Point(padding+x,padding+y), blend, NORMAL_CLONE);	
 	//seamlessClone(bestPatch, this->imCur, Mat(bestPatch.size(), CV_8UC1, Scalar(255)), Point(x, y), blend, NORMAL_CLONE);
 	this->imCur = blend(Rect(padding, padding, this->imCur.cols, this->imCur.rows));
 }	// removeBlemish
