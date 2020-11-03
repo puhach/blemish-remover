@@ -258,6 +258,7 @@ void BlemishRemover::welcome()
 	//this->imDecorated.setTo(Scalar(153,153,0));
 	this->imDecorated.setTo(Scalar(21, 79, 241));
 	//this->imDecorated.setTo(Scalar(0xDA, 0xED, 0xFC));
+	//this->imDecorated.setTo(Scalar(255,255,255));
 
 	static constexpr int nlines = 6;
 	static constexpr char* text[nlines] = { 
@@ -283,6 +284,7 @@ void BlemishRemover::welcome()
 			//, fontFace, fontScale, Scalar(0x34,0x4E,0xEE), 1, LINE_AA);
 			, fontFace, fontScale, Scalar(167, 241, 225), 1, LINE_AA);
 			//, fontFace, fontScale, Scalar(167,241,225), 1, LINE_AA);
+			//, fontFace, fontScale, Scalar(191,23,48), 1, LINE_AA);
 			//, fontFace, fontScale, Scalar(2, 55, 189), 1, LINE_AA);
 		//line(this->imDecorated, Point(0, lineHeight * (i+1)), Point(this->imCur.cols, lineHeight * (i+1)), Scalar(0, 0, 255));
 	}	// for
