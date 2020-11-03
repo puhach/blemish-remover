@@ -39,8 +39,11 @@ private:
 
 	bool undo();
 
-	Mat imSrc, imCur;
+	void decorate(int x, int y);
+
+	Mat imSrc, imCur, imDecorated;
 	deque<Mat> undoQueue;
+	int lastMouseX = 0, lastMouseY = 0;
 };	// BlemishRemover
 
 
@@ -64,21 +67,25 @@ void BlemishRemover::process(const char *inputFilePath)
 	CV_Assert(!this->imSrc.empty());
 	
 	this->imSrc.copyTo(this->imCur);
+	this->imCur.copyTo(this->imDecorated);
 	
 	for (int key = 0; (key & 0xFF) != 27; )		// exit on Escape
 	{
-		imshow(BlemishRemover::windowName, imCur);
+		imshow(BlemishRemover::windowName, this->imDecorated);
+		//imshow(BlemishRemover::windowName, imCur);
 		
 		key = waitKey(10);
 
 		if (key == 26)		// Ctrl+Z
 		{
-			undo();	// undo
+			if (undo())	// undo
+				decorate(this->lastMouseX, this->lastMouseY);
 		}	// undo
 		else if ((key & 0xFF) == 'r' || (key & 0xFF) == 'R')
 		{
 			// Reset
 			this->imSrc.copyTo(this->imCur);
+			this->imSrc.copyTo(this->imDecorated);
 		}	// reset
 	}	// for
 }	// process
@@ -96,6 +103,14 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 		br->saveState();
 		//circle(br->imCur, Point(x,y), BlemishRemover::blemishSize, Scalar(0,255,0), -1);
 		br->removeBlemish(x, y);
+		br->imCur.copyTo(br->imDecorated);
+		break;
+
+	case EVENT_MOUSEMOVE:
+		//br->imCur.copyTo(br->imDecorated);
+		br->decorate(x, y);
+		br->lastMouseX = x;
+		br->lastMouseY = y;
 		break;
 	}	// switch
 }	// onMouse
@@ -207,11 +222,21 @@ bool BlemishRemover::undo()
 	}
 }	// undo
 
+void BlemishRemover::decorate(int x, int y)
+{
+	this->imCur.copyTo(this->imDecorated);
+
+	// Don't draw the circle if it exceeds image boundaries
+	int r = BlemishRemover::blemishSize / 2;
+	if (x-r >= 0 && x+r < this->imDecorated.cols && y-r >= 0 && y+r < this->imDecorated.rows)
+		circle(this->imDecorated, Point(x, y), r, Scalar(233, 233, 233), 1);
+}	// decorate
+
 int main(int argc, char* argv[])
 {
 	if (argc != 2)
 	{
-		cout << "Usage: reblemish <input image>" << endl;
+		cout << "Usage: reblem <input image>" << endl;
 		return -1;
 	}
 
