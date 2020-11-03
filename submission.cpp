@@ -33,7 +33,7 @@ private:
 
 	void removeBlemish(int x, int y);
 
-	double calcSharpness(const Mat &roi);
+	double estimateSharpness(const Mat &roi, const Mat &mask) const;
 
 	void saveState();
 
@@ -109,12 +109,17 @@ void BlemishRemover::removeBlemish(int x, int y)
 	Mat imPadded;
 	copyMakeBorder(this->imCur, imPadded, padding, padding, padding, padding, BORDER_REFLECT | BORDER_ISOLATED);
 
-	// Compute gradients to measure smoothness (since the input image is 8-bit, the derivatives will be truncated)
-	Mat gradX, gradY;
-	Sobel(imPadded, gradX, CV_16S, 1, 0, CV_SCHARR);	// Scharr filter that may give more accurate results than 3x3 Sobel
-	Sobel(imPadded, gradY, CV_16S, 0, 1, CV_SCHARR);
-	Mat absGrad = abs(gradX) + abs(gradY);
-	//cout << absGrad << endl;
+	// Create a round mask for the selected rectangular patch
+	Mat mask(blemishSize, blemishSize, CV_8UC1, Scalar(0));
+	circle(mask, Point(blemishSize / 2, blemishSize / 2), blemishSize/2, Scalar(255), -1);
+	//cout << mask << endl;
+
+	//// Compute gradients to measure smoothness (since the input image is 8-bit, the derivatives will be truncated)
+	//Mat gradX, gradY;
+	//Sobel(imPadded, gradX, CV_16S, 1, 0, CV_SCHARR);	// Scharr filter that may give more accurate results than 3x3 Sobel
+	//Sobel(imPadded, gradY, CV_16S, 0, 1, CV_SCHARR);
+	//Mat absGrad = abs(gradX) + abs(gradY);
+	////cout << absGrad << endl;
 
 	// The direction arrays aid in calculating the centers of the neighboring regions
 	static constexpr int ndirs = 4;
@@ -134,11 +139,17 @@ void BlemishRemover::removeBlemish(int x, int y)
 		if (colRange.start < 0 || colRange.end > imPadded.cols || rowRange.start < 0 || rowRange.end > imPadded.rows)
 			continue;
 
-		double sharpness = sum(sum(absGrad(rowRange, colRange)))[0];
+		const Mat &patch = imPadded(rowRange, colRange);
+		//Mat patchgrad1 = absGrad(rowRange, colRange);
+		//cout << patchgrad1 << endl;
+
+		double sharpness = estimateSharpness(patch, mask);
+
+		//double sharpness = sum(sum(absGrad(rowRange, colRange)))[0];
 		if (sharpness < minSharpness)
 		{
 			minSharpness = sharpness;
-			bestPatch = imPadded(rowRange, colRange);
+			bestPatch = patch;
 		}
 	}	// for
 
@@ -148,10 +159,10 @@ void BlemishRemover::removeBlemish(int x, int y)
 		return;
 	}
 
-	// Create a round mask for the selected rectangular patch
-	Mat mask(bestPatch.size(), CV_8UC1, Scalar(0));
-	CV_Assert(mask.rows == blemishSize && mask.cols == blemishSize);
-	circle(mask, Point(bestPatch.cols / 2, bestPatch.rows / 2), blemishSize, Scalar(255), -1);
+	//// Create a round mask for the selected rectangular patch
+	//Mat mask(bestPatch.size(), CV_8UC1, Scalar(0));
+	//CV_Assert(mask.rows == blemishSize && mask.cols == blemishSize);
+	//circle(mask, Point(bestPatch.cols / 2, bestPatch.rows / 2), blemishSize, Scalar(255), -1);
 
 	// Replace the blemish region with the smoothest neighboring region
 	Mat blend;
@@ -161,14 +172,18 @@ void BlemishRemover::removeBlemish(int x, int y)
 	this->imCur = blend(Rect(padding, padding, this->imCur.cols, this->imCur.rows));
 }	// removeBlemish
 
-//double BlemishRemover::calcSharpness(const Mat &roi) const
-//{
-//	Mat roiGray;
-//	Mat gradx, grady;
-//	Sobel(roi, gradx, CV_64F, 1, 0, 3);
-//	Sobel(roi, grady, CV_64F, 0, 1, 3);
-//	return sum(abs(gradx)) + sum(abs(grady));
-//}	// calcSharpness
+double BlemishRemover::estimateSharpness(const Mat &roi, const Mat &mask) const
+{
+	// Compute gradients to measure smoothness (since the input image is 8-bit, the derivatives will be truncated)
+	Mat gradx, grady;
+	Sobel(roi, gradx, CV_16S, 1, 0, CV_SCHARR);		// Scharr filter that may give more accurate results than 3x3 Sobel
+	Sobel(roi, grady, CV_16S, 0, 1, CV_SCHARR);
+	//return sum(sum(abs(gradx)) + sum(abs(grady)))[0];
+
+	Mat roiGrad;
+	add(abs(gradx), abs(grady), roiGrad, mask);
+	return sum(sum(roiGrad))[0];
+}	// estimateSharpness
 
 void BlemishRemover::saveState()
 {
