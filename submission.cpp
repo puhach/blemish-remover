@@ -16,23 +16,25 @@ using namespace cv;
 class BlemishRemover
 {
 public:
-	BlemishRemover();
-	// TODO: define copy and move constructors along with assignment and move-assignment operators
-
+	BlemishRemover(const char *windowName);
+	BlemishRemover(const BlemishRemover&) = delete;
+	BlemishRemover(BlemishRemover&&) = default;
 	~BlemishRemover();
 
 	void process(const char* inputFile);
 
+	BlemishRemover& operator = (const BlemishRemover&) = delete;
+	BlemishRemover& operator = (BlemishRemover&&) = delete;
 	
 private:
 
-	static constexpr const char windowName[] = "Blemish Removal";
-	
-	static constexpr int maxUndoQueueLength = 10;
+	//static constexpr const char windowName[] = "Blemish Removal";
 	
 	// Blemish size must be odd
 	static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
 	//static constexpr int blemishSize = 25;	
+
+	static constexpr int maxUndoQueueLength = 10;
 
 	static void onMouse(int event, int x, int y, int flags, void *data);
 
@@ -50,6 +52,7 @@ private:
 
 	void decorate(int x, int y);
 
+	String windowName;
 	Mat imSrc, imCur, imDecorated;
 	deque<Mat> undoQueue;
 	int blemishSize = defaultBlemishSize;
@@ -58,13 +61,14 @@ private:
 };	// BlemishRemover
 
 
-BlemishRemover::BlemishRemover()
+BlemishRemover::BlemishRemover(const char *windowName)
+	: windowName(windowName)
 {
-	//static_assert(BlemishRemover::blemishSize > 0 && BlemishRemover::blemishSize % 2 == 1, "Blemish size must be a positive odd integer.");
+	namedWindow(this->windowName);
 
-	namedWindow(BlemishRemover::windowName);
+	//namedWindow(BlemishRemover::windowName);
 
-	setMouseCallback(BlemishRemover::windowName, onMouse, this);
+	//setMouseCallback(BlemishRemover::windowName, onMouse, this);
 }	// ctor
 
 BlemishRemover::~BlemishRemover()
@@ -79,12 +83,14 @@ void BlemishRemover::process(const char *inputFilePath)
 	this->imSrc = imread(inputFilePath, IMREAD_COLOR);
 	CV_Assert(!this->imSrc.empty());
 
+	setMouseCallback(this->windowName, BlemishRemover::onMouse, this);
+
 	reset();
 	welcome();
 
 	for (int key = 0; (key & 0xFF) != 27; )		// exit on Escape
 	{
-		imshow(BlemishRemover::windowName, this->imDecorated);
+		imshow(this->windowName, this->imDecorated);
 		
 		key = waitKey(10);
 
@@ -324,7 +330,7 @@ int main(int argc, char* argv[])
 
 	try
 	{
-		BlemishRemover blemishRemover;
+		BlemishRemover blemishRemover("Blemish Removal");		
 		blemishRemover.process(argv[1]);
 	}
 	catch (const std::exception& e)		// cv::Exception inherits std::exception
