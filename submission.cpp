@@ -31,8 +31,13 @@ private:
 	//static constexpr const char windowName[] = "Blemish Removal";
 	
 	// Blemish size must be odd
-	static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
-	//static constexpr int blemishSize = 25;	
+    static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
+	//static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
+	///static constexpr int blemishSize = 25;	
+    /*enum : int
+    {
+        minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2
+    };*/
 
 	static constexpr int maxUndoQueueLength = 10;
 
@@ -59,6 +64,9 @@ private:
 	bool intro = true;
 	int lastMouseX = 0, lastMouseY = 0;
 };	// BlemishRemover
+
+// Before C++17 even a constexpr static data member must be initialized inside the class definition
+constexpr int BlemishRemover::minBlemishSize, BlemishRemover::maxBlemishSize, BlemishRemover::defaultBlemishSize, BlemishRemover::blemishSizeStep;
 
 
 BlemishRemover::BlemishRemover(const char *windowName)
@@ -143,7 +151,7 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 
 	case EVENT_MOUSEWHEEL:
 		if (getMouseWheelDelta(flags) > 0)
-			br->blemishSize = min(min(br->blemishSize + blemishSizeStep, br->maxBlemishSize), min(br->imCur.rows, br->imCur.cols));
+			br->blemishSize = min(min(br->blemishSize + blemishSizeStep, br->maxBlemishSize), min(br->imCur.rows, br->imCur.cols));            
 		else
 			br->blemishSize = max(br->blemishSize - blemishSizeStep, br->minBlemishSize);
 
@@ -267,9 +275,11 @@ void BlemishRemover::welcome()
 	this->imDecorated.setTo(Scalar(21, 79, 241));
 	//this->imDecorated.setTo(Scalar(0xDA, 0xED, 0xFC));
 	//this->imDecorated.setTo(Scalar(255,255,255));
-
+    
+    
 	static constexpr int nlines = 6;
-	static constexpr char* text[nlines] = { 
+	static constexpr char text[nlines][100] = {    // the compiler will warn in case the initializer string exceeds the fixed size
+    //static constexpr string text[nlines] = {
 		"Left click to remove a blemish",
 		"Wheel to change the size of the healing brush",
 		"Press Ctrl+Z to undo the last action",
