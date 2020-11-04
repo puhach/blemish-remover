@@ -166,8 +166,10 @@ void BlemishRemover::removeBlemish(int x, int y)
 	circle(mask, Point(this->blemishSize / 2, this->blemishSize / 2), this->blemishSize/2, Scalar(255), -1);
 	
 	// The direction arrays aid in calculating the centers of the neighboring regions
-	static constexpr int ndirs = 4;		// TODO: perhaps, use 8 directions?
-	static constexpr int xdir[ndirs] = { -1, 0, +1, 0 }, ydir[ndirs] = { 0, -1, 0, +1 };
+	/*static constexpr int ndirs = 4;		
+	static constexpr int xdir[ndirs] = { -1, 0, +1, 0 }, ydir[ndirs] = { 0, -1, 0, +1 };*/
+	static constexpr int ndirs = 8;
+	static constexpr int xdir[ndirs] = { -1, -1, 0, +1, +1, +1, 0, -1 }, ydir[ndirs] = { 0, -1, -1, -1, 0, +1, +1, +1 };
 
 	// Select the smoothest neighboring region
 	Mat bestPatch;
@@ -279,7 +281,7 @@ void BlemishRemover::welcome()
 	static constexpr int fontFace = FONT_HERSHEY_COMPLEX_SMALL;
 	static constexpr double fontScale = 0.8;
 
-	int lineHeight = this->imDecorated.rows / nlines;
+	int lineHeight = min(100, this->imDecorated.rows / nlines);
 	//double fontScale = getFontScaleFromHeight(fontFace, lineHeight, 1);
 
 	for (int i = 0; i < nlines; ++i)
