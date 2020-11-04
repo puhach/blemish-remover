@@ -137,7 +137,7 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 
 	case EVENT_MOUSEWHEEL:
 		if (getMouseWheelDelta(flags) > 0)
-			br->blemishSize = min(br->blemishSize + blemishSizeStep, br->maxBlemishSize);
+			br->blemishSize = min(min(br->blemishSize + blemishSizeStep, br->maxBlemishSize), min(br->imCur.rows, br->imCur.cols));
 		else
 			br->blemishSize = max(br->blemishSize - blemishSizeStep, br->minBlemishSize);
 
@@ -278,8 +278,9 @@ void BlemishRemover::welcome()
 
 	for (int i = 0; i < nlines; ++i)
 	{
-		int baseLine;
-		const Size& sz = getTextSize(text[i], fontFace, fontScale, 1, &baseLine);
+		//int baseLine;
+		//const Size& sz = getTextSize(text[i], fontFace, fontScale, 1, &baseLine);
+		const Size& sz = getTextSize(text[i], fontFace, fontScale, 1, nullptr);
 		putText(this->imDecorated, text[i], Point(10, lineHeight*i+(lineHeight+sz.height)/2)
 			//, fontFace, fontScale, Scalar(0x34,0x4E,0xEE), 1, LINE_AA);
 			, fontFace, fontScale, Scalar(167, 241, 225), 1, LINE_AA);
@@ -300,7 +301,7 @@ void BlemishRemover::decorate(int x, int y)
 
 	// Don't draw the circle if the mouse cursor is leaving the window. Unfortunately, OpenCV doesn't provide a mouse leave event.
 	// This code is used as a workaround, so we check whether the mouse position is near the border.  
-	int margin = 2;
+	int margin = 14;
 	if (x > margin && x < this->imCur.cols-margin && y > margin && y < this->imCur.rows-margin)
 		circle(this->imDecorated, Point(x, y), this->blemishSize/2, Scalar(233, 233, 233), 1);
 
