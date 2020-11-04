@@ -4,12 +4,11 @@ cmake_minimum_required(VERSION 2.8.12)
 project(BlemishRemover)
 SET(CMAKE_CXX_STANDARD 11)
 
-#SET(OpenCV_DIR /home/hp/workfolder/OpenCV-Installation/installation/OpenCV-master/lib/cmake/opencv4)
 
 ######################## EDIT IF REQUIRED ####################
-# ###Uncomment the line below and specify the path to OpenCV directory i.e. the path to the OpenCVConfig.cmake file. Check the examples given below.
+# Edit the line below to specify the path to OpenCV directory i.e. the path to the OpenCVConfig.cmake file. Check the examples given below.
 #SET(OpenCV_DIR Enter-the-path-of-OpenCV-installation-on-your-system)
-
+set(OpenCV_DIR /opt/opencv/4.4.0/installation/lib/cmake/opencv4)
 
 ################### OpenCV_DIR Examples  #####################
 
@@ -22,11 +21,6 @@ SET(CMAKE_CXX_STANDARD 11)
 ##############################################################
 
 
-
-
-###################   ***DO NOT EDIT***  #####################
-
-#############  Common Instructions for all Users  ############
 
 find_package( OpenCV REQUIRED )
 
