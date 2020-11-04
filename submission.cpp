@@ -27,17 +27,9 @@ public:
 	BlemishRemover& operator = (BlemishRemover&&) = delete;
 	
 private:
-
-	//static constexpr const char windowName[] = "Blemish Removal";
 	
 	// Blemish size must be odd
     static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
-	//static constexpr int minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2;
-	///static constexpr int blemishSize = 25;	
-    /*enum : int
-    {
-        minBlemishSize = 5, maxBlemishSize = 99, defaultBlemishSize = 33, blemishSizeStep = 2
-    };*/
 
 	static constexpr int maxUndoQueueLength = 10;
 
@@ -73,10 +65,6 @@ BlemishRemover::BlemishRemover(const char *windowName)
 	: windowName(windowName)
 {
 	namedWindow(this->windowName);
-
-	//namedWindow(BlemishRemover::windowName);
-
-	//setMouseCallback(BlemishRemover::windowName, onMouse, this);
 }	// ctor
 
 BlemishRemover::~BlemishRemover()
@@ -86,12 +74,10 @@ BlemishRemover::~BlemishRemover()
 
 void BlemishRemover::process(const char *inputFilePath)
 {
-	this->intro = true;
+	this->intro = true;    // start in the intro mode when we show the user's guide
 
 	this->imSrc = imread(inputFilePath, IMREAD_COLOR);
 	CV_Assert(!this->imSrc.empty());
-
-	setMouseCallback(this->windowName, BlemishRemover::onMouse, this);
 
 	reset();
 	welcome();
@@ -101,29 +87,42 @@ void BlemishRemover::process(const char *inputFilePath)
 		imshow(this->windowName, this->imDecorated);
 		
 		key = waitKey(10);
+        //cout << key << endl;
+        char subkey = static_cast<char>(key & 0xFF);
 
 		if (this->intro)
 		{
-			if ((key & 0xFF) == 32)	// Space - leave the intro mode
+			//if ((key & 0xFF) == 32)	// Space - leave the intro mode
+            if (subkey == 32)	// Space - leave the intro mode
 			{
 				this->intro = false;
-				decorate(this->lastMouseX, this->lastMouseY);
+                setMouseCallback(this->windowName, BlemishRemover::onMouse, this);
+				decorate(this->lastMouseX, this->lastMouseY);   // show the healing brush circle
 			}	// start
 		}	// intro
 		else
 		{
-			if (key == 26)		// Ctrl+Z - undo
+			//if (key == 26 || key == 122 || key == 90)		// Ctrl+Z - undo (depending on a platform, may have different key values)
+            //if ((key & 0xFF) == 'u' || (key & 0xFF) == 'U')     // u/U - undo
+            if (subkey == 'u' || subkey == 'U')     // u/U - undo
 			{
-				if (undo())	// undo
+				/*if (undo())	// undo
 					decorate(this->lastMouseX, this->lastMouseY);	// draw a healing brush circle
 				else
 					cout << '\a';	// beep
+					*/
+                
+                if (!undo())
+                    cout << '\a';   // beep
 			}	// undo
-			else if ((key & 0xFF) == 'r' || (key & 0xFF) == 'R')	// r/R - reset
+			//else if ((key & 0xFF) == 'r' || (key & 0xFF) == 'R')	// r/R - reset
+			else if (subkey == 'r' || subkey == 'R')	// r/R - reset
 			{
 				reset();	// reset images and the undo queue
 				//welcome();
 			}	// reset
+			
+			decorate(this->lastMouseX, this->lastMouseY);
 		}	// !intro
 	}	// for
 }	// process
@@ -132,8 +131,9 @@ void BlemishRemover::process(const char *inputFilePath)
 void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 {
 	BlemishRemover* br = static_cast<BlemishRemover*>(data);
-	if (br->intro)
-		return;
+    assert(!br->intro);
+	//if (br->intro) // no need to handle mouse events in the intro mode
+	//	return;
 
 	switch (event)
 	{
@@ -144,7 +144,7 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 		break;
 
 	case EVENT_MOUSEMOVE:
-		br->decorate(x, y);
+		//br->decorate(x, y);
 		br->lastMouseX = x;
 		br->lastMouseY = y;
 		break;
@@ -155,7 +155,7 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 		else
 			br->blemishSize = max(br->blemishSize - blemishSizeStep, br->minBlemishSize);
 
-		br->decorate(x, y);		
+		//br->decorate(x, y);		
 		break;
 	}	// switch
 }	// onMouse
@@ -260,7 +260,7 @@ void BlemishRemover::reset()
 {
 	//this->intro = true;
 	this->imSrc.copyTo(this->imCur);
-	this->imCur.copyTo(this->imDecorated);
+	//this->imCur.copyTo(this->imDecorated);
 	this->undoQueue.clear();
 	this->blemishSize = BlemishRemover::defaultBlemishSize;
 }	// reset
@@ -269,20 +269,17 @@ void BlemishRemover::welcome()
 {
 	assert(this->intro);
 
-	//this->imDecorated = Mat(this->imSrc.size(), CV_8UC3, Scalar(255,255,255));
-	//this->imDecorated.setTo(Scalar(255,255,255));
-	//this->imDecorated.setTo(Scalar(153,153,0));
-	this->imDecorated.setTo(Scalar(21, 79, 241));
-	//this->imDecorated.setTo(Scalar(0xDA, 0xED, 0xFC));
-	//this->imDecorated.setTo(Scalar(255,255,255));
-    
+	this->imDecorated = Mat(this->imSrc.size(), CV_8UC3, Scalar(21, 79, 241));	
+	//this->imDecorated.setTo(Scalar(21, 79, 241));
+	
     
 	static constexpr int nlines = 6;
 	static constexpr char text[nlines][100] = {    // the compiler will warn in case the initializer string exceeds the fixed size
     //static constexpr string text[nlines] = {
 		"Left click to remove a blemish",
 		"Wheel to change the size of the healing brush",
-		"Press Ctrl+Z to undo the last action",
+		//"Press Ctrl+Z to undo the last action",
+        "Press U to undo the last action",
 		"Press R to reset",
 		"Press Space to start",
 		"Press Escape to quit"
@@ -319,7 +316,7 @@ void BlemishRemover::decorate(int x, int y)
 
 	// Don't draw the circle if the mouse cursor is leaving the window. Unfortunately, OpenCV doesn't provide a mouse leave event.
 	// This code is used as a workaround, so we check whether the mouse position is near the border.  
-	int margin = 14;
+	int margin = 15;
 	if (x > margin && x < this->imCur.cols-margin && y > margin && y < this->imCur.rows-margin)
 		circle(this->imDecorated, Point(x, y), this->blemishSize/2, Scalar(233, 233, 233), 1);
 
