@@ -87,12 +87,10 @@ void BlemishRemover::process(const char *inputFilePath)
 		imshow(this->windowName, this->imDecorated);
 		
 		key = waitKey(10);
-        //cout << key << endl;
         char subkey = static_cast<char>(key & 0xFF);
 
 		if (this->intro)
 		{
-			//if ((key & 0xFF) == 32)	// Space - leave the intro mode
             if (subkey == 32)	// Space - leave the intro mode
 			{
 				this->intro = false;
@@ -102,24 +100,14 @@ void BlemishRemover::process(const char *inputFilePath)
 		}	// intro
 		else
 		{
-			//if (key == 26 || key == 122 || key == 90)		// Ctrl+Z - undo (depending on a platform, may have different key values)
-            //if ((key & 0xFF) == 'u' || (key & 0xFF) == 'U')     // u/U - undo
             if (subkey == 'u' || subkey == 'U')     // u/U - undo
-			{
-				/*if (undo())	// undo
-					decorate(this->lastMouseX, this->lastMouseY);	// draw a healing brush circle
-				else
-					cout << '\a';	// beep
-					*/
-                
+			{				
                 if (!undo())
                     cout << '\a';   // beep
 			}	// undo
-			//else if ((key & 0xFF) == 'r' || (key & 0xFF) == 'R')	// r/R - reset
 			else if (subkey == 'r' || subkey == 'R')	// r/R - reset
 			{
 				reset();	// reset images and the undo queue
-				//welcome();
 			}	// reset
 			
 			decorate(this->lastMouseX, this->lastMouseY);
@@ -132,19 +120,15 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 {
 	BlemishRemover* br = static_cast<BlemishRemover*>(data);
     assert(!br->intro);
-	//if (br->intro) // no need to handle mouse events in the intro mode
-	//	return;
 
 	switch (event)
 	{
 	case EVENT_LBUTTONUP:
 		br->saveState();	// save current state to the undo queue
 		br->removeBlemish(x, y);
-		br->imCur.copyTo(br->imDecorated);
 		break;
 
 	case EVENT_MOUSEMOVE:
-		//br->decorate(x, y);
 		br->lastMouseX = x;
 		br->lastMouseY = y;
 		break;
@@ -154,8 +138,6 @@ void BlemishRemover::onMouse(int event, int x, int y, int flags, void* data)
 			br->blemishSize = min(min(br->blemishSize + blemishSizeStep, br->maxBlemishSize), min(br->imCur.rows, br->imCur.cols));            
 		else
 			br->blemishSize = max(br->blemishSize - blemishSizeStep, br->minBlemishSize);
-
-		//br->decorate(x, y);		
 		break;
 	}	// switch
 }	// onMouse
@@ -174,8 +156,6 @@ void BlemishRemover::removeBlemish(int x, int y)
 	circle(mask, Point(this->blemishSize / 2, this->blemishSize / 2), this->blemishSize/2, Scalar(255), -1);
 	
 	// The direction arrays aid in calculating the centers of the neighboring regions
-	/*static constexpr int ndirs = 4;		
-	static constexpr int xdir[ndirs] = { -1, 0, +1, 0 }, ydir[ndirs] = { 0, -1, 0, +1 };*/
 	static constexpr int ndirs = 8;
 	static constexpr int xdir[ndirs] = { -1, -1, 0, +1, +1, +1, 0, -1 }, ydir[ndirs] = { 0, -1, -1, -1, 0, +1, +1, +1 };
 
@@ -183,36 +163,37 @@ void BlemishRemover::removeBlemish(int x, int y)
 	Mat bestPatch;
 	double minSharpness = numeric_limits<double>::max();
 
-	for (int i = 0; i < ndirs; ++i)
+	for (int i = 0; i < ndirs; ++i)		// check neighbors in all directions
 	{
+		// Compute the center of a neighboring region
 		int nx = padding + x + xdir[i] * this->blemishSize, ny = padding + y + ydir[i] * this->blemishSize;
 
+		// Find the region's boundaries
 		Range colRange(nx - this->blemishSize / 2, nx + this->blemishSize / 2 + 1)
 			, rowRange(ny - this->blemishSize / 2, ny + this->blemishSize / 2 + 1);
 
+		// A patch exceeding the image boundaries cannot be used
 		if (colRange.start < 0 || colRange.end > imPadded.cols || rowRange.start < 0 || rowRange.end > imPadded.rows)
 			continue;
 
+		// Evaluate the patch
 		const Mat &patch = imPadded(rowRange, colRange);
 		double sharpness = estimateSharpness(patch, mask);
 
-		if (sharpness < minSharpness)
+		if (sharpness < minSharpness)	// choose the best patch
 		{
 			minSharpness = sharpness;
 			bestPatch = patch;
 		}
 	}	// for
 
+	// It's unlikely to happen, but in case the image is very small (comparable to the size of the healing brush),
+	// there might be no whole neighboring region to patch the blemish
 	if (bestPatch.empty())
 	{
 		cout << "Unable to fix this blemish due to the lack of surrounding pixels." << '\a' << endl;
 		return;
 	}
-
-	//// Create a round mask for the selected rectangular patch
-	//Mat mask(bestPatch.size(), CV_8UC1, Scalar(0));
-	//CV_Assert(mask.rows == blemishSize && mask.cols == blemishSize);
-	//circle(mask, Point(bestPatch.cols / 2, bestPatch.rows / 2), blemishSize, Scalar(255), -1);
 
 	// Replace the blemish region with the smoothest neighboring region
 	Mat blend;
@@ -226,7 +207,6 @@ double BlemishRemover::estimateSharpness(const Mat &roi, const Mat &mask) const
 	Mat gradx, grady;
 	Sobel(roi, gradx, CV_16S, 1, 0, CV_SCHARR);		// Scharr filter that may give more accurate results than 3x3 Sobel
 	Sobel(roi, grady, CV_16S, 0, 1, CV_SCHARR);
-	//return sum(sum(abs(gradx)) + sum(abs(grady)))[0];
 
 	Mat roiGrad;
 	add(abs(gradx), abs(grady), roiGrad, mask);
@@ -258,9 +238,7 @@ bool BlemishRemover::undo()
 
 void BlemishRemover::reset()
 {
-	//this->intro = true;
 	this->imSrc.copyTo(this->imCur);
-	//this->imCur.copyTo(this->imDecorated);
 	this->undoQueue.clear();
 	this->blemishSize = BlemishRemover::defaultBlemishSize;
 }	// reset
@@ -269,16 +247,12 @@ void BlemishRemover::welcome()
 {
 	assert(this->intro);
 
-	this->imDecorated = Mat(this->imSrc.size(), CV_8UC3, Scalar(21, 79, 241));	
-	//this->imDecorated.setTo(Scalar(21, 79, 241));
-	
+	this->imDecorated = Mat(this->imSrc.size(), CV_8UC3, Scalar(21, 79, 241));	// the background
     
 	static constexpr int nlines = 6;
 	static constexpr char text[nlines][100] = {    // the compiler will warn in case the initializer string exceeds the fixed size
-    //static constexpr string text[nlines] = {
 		"Left click to remove a blemish",
 		"Wheel to change the size of the healing brush",
-		//"Press Ctrl+Z to undo the last action",
         "Press U to undo the last action",
 		"Press R to reset",
 		"Press Space to start",
@@ -289,24 +263,13 @@ void BlemishRemover::welcome()
 	static constexpr double fontScale = 0.8;
 
 	int lineHeight = min(100, this->imDecorated.rows / nlines);
-	//double fontScale = getFontScaleFromHeight(fontFace, lineHeight, 1);
 
 	for (int i = 0; i < nlines; ++i)
 	{
-		//int baseLine;
-		//const Size& sz = getTextSize(text[i], fontFace, fontScale, 1, &baseLine);
 		const Size& sz = getTextSize(text[i], fontFace, fontScale, 1, nullptr);
 		putText(this->imDecorated, text[i], Point(10, lineHeight*i+(lineHeight+sz.height)/2)
-			//, fontFace, fontScale, Scalar(0x34,0x4E,0xEE), 1, LINE_AA);
 			, fontFace, fontScale, Scalar(167, 241, 225), 1, LINE_AA);
-			//, fontFace, fontScale, Scalar(167,241,225), 1, LINE_AA);
-			//, fontFace, fontScale, Scalar(191,23,48), 1, LINE_AA);
-			//, fontFace, fontScale, Scalar(2, 55, 189), 1, LINE_AA);
-		//line(this->imDecorated, Point(0, lineHeight * (i+1)), Point(this->imCur.cols, lineHeight * (i+1)), Scalar(0, 0, 255));
 	}	// for
-
-	//imshow(BlemishRemover::windowName, this->imDecorated);
-	//waitKey();
 }	// welcome
 
 void BlemishRemover::decorate(int x, int y)
@@ -347,7 +310,6 @@ int main(int argc, char* argv[])
 		cerr << e.what() << endl;
 		return -2;
 	}
-		
 
 	return 0;
 }
